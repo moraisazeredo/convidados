@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chá de Panela - João e Kethelyn</title>
+    <!--
+        -----------------------------------------------------------------------------
+        Antes de usar:
+        1. No SQL Editor do Supabase, execute o script abaixo para criar a tabela.
+
+        CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+        CREATE TABLE IF NOT EXISTS convidados (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            nome TEXT NOT NULL,
+            telefone TEXT,
+            confirmado BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+        );
+        -----------------------------------------------------------------------------
+    -->
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #6b5b95;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 700px;
+        }
+        input[type="text"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .form-row input[type="text"] {
+            flex: 1;
+        }
+        label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        button {
+            background: #6b5b95;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px 10px 0;
+        }
+        button:hover {
+            background: #563d7c;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            background: #f9f9f9;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .actions {
+            display: flex;
+            gap: 5px;
+        }
+        .edit-btn, .delete-btn, .toggle-btn {
+            background: #ffc107;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .delete-btn {
+            background: #dc3545;
+        }
+        .toggle-btn {
+            background: #17a2b8;
+        }
+        .edit-btn:hover {
+            background: #e0a800;
+        }
+        .delete-btn:hover {
+            background: #c82333;
+        }
+        .toggle-btn:hover {
+            background: #117a8b;
+        }
+        .confirmed {
+            font-weight: bold;
+            color: green;
+        }
+        .not-confirmed {
+            color: #888;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Chá de Panela - João e Kethelyn</h1>
+    <div class="container">
+        <div class="form-row">
+            <input type="text" id="guestName" placeholder="Nome do convidado">
+            <input type="text" id="guestPhone" placeholder="Telefone (opcional)">
+            <select id="guestClass">
+                <option value="">Classificação</option>
+                <option value="Família João">Família João</option>
+                <option value="Família Kethelyn">Família Kethelyn</option>
+                <option value="Crianças">Crianças</option>
+                <option value="Amigos João">Amigos João</option>
+                <option value="Amigos Kethelyn">Amigos Kethelyn</option>
+            </select>
+            <label>
+                <input type="checkbox" id="guestConfirmed">
+                Confirmado
+            </label>
+        </div>
+        <button id="addBtn">Adicionar</button>
+        <ul id="guestList"></ul>
+    </div>
+
+    <script>
+        // Configurações Supabase
+        const supabaseUrl = 'https://xkyvezurtdxxkcwymtct.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhreXZlenVydGR4eGtjd3ltdGN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4OTI5MzYsImV4cCI6MjA2ODQ2ODkzNn0.jpD8yHGW3F-8O5qRsgZbY7gpb3afJnzby9VGPFWGu5M';
+        const supa = supabase.createClient(supabaseUrl, supabaseKey);
+
+        let guests = [];
+        let editingId = null;
+
+        const guestList = document.getElementById('guestList');
+        const guestNameInput = document.getElementById('guestName');
+        const guestPhoneInput = document.getElementById('guestPhone');
+        const guestConfirmedInput = document.getElementById('guestConfirmed');
+        const guestClassInput = document.getElementById('guestClass');
+        const addBtn = document.getElementById('addBtn');
+
+        // Renderiza convidados na tela
+        function renderGuests() {
+            guestList.innerHTML = '';
+            guests.forEach((guest) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span class="${guest.confirmado ? 'confirmed' : 'not-confirmed'}">
+                        ${guest.nome} - ${guest.telefone || ''} ${guest.confirmado ? '✔️' : '❌'} ${guest.classificacao ? `<em>[${guest.classificacao}]</em>` : ''}
+                    </span>
+                    <div class="actions">
+                        <button class="edit-btn" onclick="editGuest('${guest.id}')">Editar</button>
+                        <button class="delete-btn" onclick="deleteGuest('${guest.id}')">Remover</button>
+                        <button class="toggle-btn" onclick="toggleConfirmation('${guest.id}', ${!guest.confirmado})">${guest.confirmado ? 'Desconfirmar' : 'Confirmar'}</button>
+                    </div>
+                `;
+                guestList.appendChild(li);
+            });
+        }
+
+        // Carrega convidados do banco
+        async function loadGuests() {
+            const { data, error } = await supa
+                .from('convidados')
+                .select('*')
+                .order('created_at', { ascending: true });
+            if (error) {
+                console.error('Erro ao carregar convidados:', error);
+                alert('Erro ao carregar convidados. Veja o console.');
+                return;
+            }
+            guests = data;
+            renderGuests();
+        }
+
+        // Adiciona ou atualiza convidado
+        async function addGuest() {
+            const nome = guestNameInput.value.trim();
+            const telefone = guestPhoneInput.value.trim();
+            const confirmado = guestConfirmedInput.checked;
+            const classificacao = guestClassInput.value;
+
+            if (!nome) {
+                alert('Por favor, informe o nome do convidado.');
+                return;
+            }
+
+            if (editingId) {
+                // Atualizar
+                const { error } = await supa
+                    .from('convidados')
+                    .update({ nome, telefone, confirmado, classificacao })
+                    .eq('id', editingId);
+                if (error) {
+                    console.error('Erro ao atualizar convidado:', error);
+                    alert('Erro ao atualizar convidado.');
+                    return;
+                }
+                editingId = null;
+                addBtn.textContent = 'Adicionar';
+            } else {
+                // Inserir
+                const { error } = await supa
+                    .from('convidados')
+                    .insert({ nome, telefone, confirmado, classificacao });
+                if (error) {
+                    console.error('Erro ao adicionar convidado:', error);
+                    alert('Erro ao adicionar convidado.');
+                    return;
+                }
+            }
+
+            // Limpa formulário e recarrega
+            guestNameInput.value = '';
+            guestPhoneInput.value = '';
+            guestConfirmedInput.checked = false;
+            guestClassInput.value = '';
+            await loadGuests();
+        }
+
+        // Preenche campos para edição
+        function editGuest(id) {
+            const guest = guests.find((g) => g.id === id);
+            if (!guest) return;
+            guestNameInput.value = guest.nome;
+            guestPhoneInput.value = guest.telefone || '';
+            guestConfirmedInput.checked = guest.confirmado;
+            guestClassInput.value = guest.classificacao || '';
+            editingId = id;
+            addBtn.textContent = 'Salvar';
+        }
+
+        // Remove convidado
+        async function deleteGuest(id) {
+            if (!confirm('Tem certeza que deseja remover este convidado?')) return;
+            const { error } = await supa.from('convidados').delete().eq('id', id);
+            if (error) {
+                console.error('Erro ao remover convidado:', error);
+                alert('Erro ao remover convidado.');
+                return;
+            }
+            await loadGuests();
+        }
+
+        // Alterna confirmação
+        async function toggleConfirmation(id, confirmado) {
+            const { error } = await supa
+                .from('convidados')
+                .update({ confirmado })
+                .eq('id', id);
+            if (error) {
+                console.error('Erro ao atualizar confirmação:', error);
+                alert('Erro ao atualizar confirmação.');
+                return;
+            }
+            await loadGuests();
+        }
+
+        // Eventos
+        addBtn.addEventListener('click', addGuest);
+
+        // Inicialização
+        loadGuests();
+    </script>
+</body>
+</html>
