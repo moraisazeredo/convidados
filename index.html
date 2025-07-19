@@ -146,6 +146,17 @@
             </label>
         </div>
         <button id="addBtn">Adicionar</button>
+        <div class="form-row" style="margin-top: 20px;">
+            <label>Filtrar por classificação:</label>
+            <select id="filterClass">
+                <option value="">Todas</option>
+                <option value="Família João">Família João</option>
+                <option value="Família Kethelyn">Família Kethelyn</option>
+                <option value="Crianças">Crianças</option>
+                <option value="Amigos João">Amigos João</option>
+                <option value="Amigos Kethelyn">Amigos Kethelyn</option>
+            </select>
+        </div>
         <ul id="guestList"></ul>
     </div>
 
@@ -165,10 +176,18 @@
         const guestClassInput = document.getElementById('guestClass');
         const addBtn = document.getElementById('addBtn');
 
+        let currentFilter = '';
+        const filterClassInput = document.getElementById('filterClass');
+        filterClassInput.addEventListener('change', (e) => {
+            currentFilter = e.target.value;
+            renderGuests();
+        });
+
         // Renderiza convidados na tela
         function renderGuests() {
             guestList.innerHTML = '';
-            guests.forEach((guest) => {
+            const filteredGuests = currentFilter ? guests.filter(g => g.classificacao === currentFilter) : guests;
+            filteredGuests.forEach((guest) => {
                 const li = document.createElement('li');
                 li.innerHTML = `
                     <span class="${guest.confirmado ? 'confirmed' : 'not-confirmed'}">
