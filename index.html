@@ -156,6 +156,10 @@
                 <option value="Amigos João">Amigos João</option>
                 <option value="Amigos Kethelyn">Amigos Kethelyn</option>
             </select>
+            <label>
+                <input type="checkbox" id="filterConfirmed">
+                Somente confirmados
+            </label>
         </div>
         <p id="totalGuests">Total de convidados: 0</p>
         <ul id="guestList"></ul>
@@ -178,16 +182,26 @@
         const addBtn = document.getElementById('addBtn');
 
         let currentFilter = '';
+        let showConfirmedOnly = false;
         const filterClassInput = document.getElementById('filterClass');
         filterClassInput.addEventListener('change', (e) => {
             currentFilter = e.target.value;
             renderGuests();
         });
 
+        const filterConfirmedInput = document.getElementById('filterConfirmed');
+        filterConfirmedInput.addEventListener('change', (e) => {
+            showConfirmedOnly = e.target.checked;
+            renderGuests();
+        });
+
         // Renderiza convidados na tela
         function renderGuests() {
             guestList.innerHTML = '';
-            const filteredGuests = currentFilter ? guests.filter(g => g.classificacao === currentFilter) : guests;
+            let filteredGuests = currentFilter ? guests.filter(g => g.classificacao === currentFilter) : guests;
+            if (showConfirmedOnly) {
+                filteredGuests = filteredGuests.filter(g => g.confirmado);
+            }
             document.getElementById('totalGuests').textContent = `Total de convidados: ${filteredGuests.length}`;
             filteredGuests.forEach((guest) => {
                 const li = document.createElement('li');
